@@ -7,17 +7,24 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { GridMaterial } from "@babylonjs/materials/grid";
 import { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
-
 import { Curve3 } from "@babylonjs/core/Maths/math.path";
 import { Mesh, PointerEventTypes } from "@babylonjs/core";
+import * as GUI from "@babylonjs/gui";
+
+
+const text = new GUI.TextBlock();
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const engine = new Engine(canvas, true);
 
 const CAMERA_POS = new Vector3(20, 20, 20);
 const GRID_COLOR = new Color3(0.5, 0.5, 0.5);
-const NUM_BLOCKS = 30;
+const NUM_BLOCKS = 40;
 const RIBBON_WIDTH = 0.2;
+
+let tempMaterial: StandardMaterial;
+let tempColor: Color3;
+const PICKED_COLOR = new Color3(0.9, 0.9, 0.1);
 
 const addRibbon = (points: { x: number, y: number, z: number }[], color: Color3, scene: Scene) => {
   const vector3Points = points.map(p => new Vector3(p.x, p.y, p.z));
@@ -62,7 +69,7 @@ const createScene = (): Scene => {
   camera.attachControl(canvas, true);
 
   const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-  light.intensity = 0.7;
+  light.intensity = 1.2;
 
   const gridSize = 20;
 
@@ -80,7 +87,6 @@ const createScene = (): Scene => {
   grid.material = gridMaterial;
 
 
-
   const ribbonPoints = [];
 
   for (let i = 0; i < NUM_BLOCKS; i++) {
@@ -95,11 +101,12 @@ const createScene = (): Scene => {
     const z = Math.floor(Math.random() * gridSize) - gridSize / 2 + 0.5;
 
     if (Math.abs(x) < 3 && Math.abs(z) < 3) {
-      height = Math.random() * 12 + 1;
+      height = Math.random() * 12 + 3;
     }
     const block = MeshBuilder.CreateBox("box", { size: 1, height: height }, scene);
     block.metadata = {
-      id: i
+      id: i,
+      height: height
     };
 
     block.position = new Vector3(x, height / 2, z);
@@ -126,7 +133,27 @@ const createScene = (): Scene => {
       case PointerEventTypes.POINTERDOWN:
         const pickResult = scene.pick(scene.pointerX, scene.pointerY);
         if (pickResult.hit && pickResult.pickedMesh) {
-          console.log(pickResult.pickedMesh.metadata);
+
+          const metadata = pickResult.pickedMesh.metadata;
+          if (metadata) {
+            console.log(metadata);
+            text.text = `block ${metadata.id}, height = ${metadata.height}`;
+          } else {
+            text.text = '';
+          }
+
+          if (tempMaterial) {
+            (tempMaterial as StandardMaterial).diffuseColor = tempColor;
+          }
+
+          const pickedMaterial = pickResult.pickedMesh.material;
+          if (pickedMaterial) {
+            tempColor = (pickedMaterial as StandardMaterial).diffuseColor;
+            (pickedMaterial as StandardMaterial).diffuseColor = PICKED_COLOR;
+            tempMaterial = pickedMaterial as StandardMaterial;
+          }
+
+
           /*
           const pickedMesh = pickResult.pickedMesh as Mesh & { _blockIndex?: number };
           if (pickedMesh._blockIndex !== undefined) {
@@ -138,11 +165,23 @@ const createScene = (): Scene => {
     }
   });
 
+  const advancedTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+  // Create text
+  text.text = "";
+  text.color = "white";
+  text.fontSize = 16;
+  text.top = "-45%";   // position
+  text.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+  text.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+
+  advancedTexture.addControl(text);
 
   return scene;
 };
 
 const scene = createScene();
+
+
 
 engine.runRenderLoop(function () {
   scene.render();
