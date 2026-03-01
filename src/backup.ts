@@ -1,0 +1,119 @@
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Scene } from "@babylonjs/core/scene";
+import { Color3, Color4, Vector3 } from "@babylonjs/core/Maths/math";
+import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { GridMaterial } from "@babylonjs/materials/grid";
+import { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
+
+import { Curve3 } from "@babylonjs/core/Maths/math.path";
+
+const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+const engine = new Engine(canvas, true);
+
+const CAMERA_POS = new Vector3(20, 20, 20);
+const GRID_COLOR = new Color3(0.5, 0.5, 0.5);
+const NUM_BLOCKS = 20;
+const RIBBON_WIDTH = 0.2;
+
+const addRibbon = (points: { x: number, y: number, z: number }[], color: Color3, scene: Scene) => {
+  const vector3Points = points.map(p => new Vector3(p.x, p.y, p.z));
+  const curve = Curve3.CreateCatmullRomSpline(vector3Points, 10, false);
+  const pathPoints = curve.getPoints();
+
+  const ribbonWidth = RIBBON_WIDTH;
+  const path1: Vector3[] = [];
+  const path2: Vector3[] = [];
+
+  for (let i = 0; i < pathPoints.length; i++) {
+    let tangent: Vector3;
+    if (i < pathPoints.length - 1) {
+      tangent = pathPoints[i + 1].subtract(pathPoints[i]).normalize();
+    } else {
+      tangent = pathPoints[i].subtract(pathPoints[i - 1]).normalize();
+    }
+
+    // Calculate a perpendicular vector in the XZ plane
+    const perpendicular = new Vector3(-tangent.z, 0, tangent.x).normalize();
+
+    path1.push(pathPoints[i].add(perpendicular.scale(ribbonWidth / 2)));
+    path2.push(pathPoints[i].subtract(perpendicular.scale(ribbonWidth / 2)));
+  }
+
+  const ribbon = MeshBuilder.CreateRibbon("ribbon", { pathArray: [path1, path2] }, scene);
+  const material = new StandardMaterial("ribbonMaterial", scene);
+  material.diffuseColor = color;
+  ribbon.material = material;
+  return ribbon;
+}
+
+const createScene = (): Scene => {
+  const scene = new Scene(engine);
+  scene.clearColor = new Color4(0, 0, 0, 1);
+
+  const camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 4, 75, new Vector3(0, 5, 0), scene);
+  camera.setPosition(CAMERA_POS);
+  camera.attachControl(canvas, true);
+
+  const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
+  light.intensity = 0.7;
+
+  const gridSize = 20;
+
+  const grid: GroundMesh = MeshBuilder.CreateGround("grid", {
+    width: gridSize,
+    height: gridSize,
+    subdivisions: gridSize
+  }, scene);
+  const gridMaterial = new GridMaterial("gridMaterial", scene);
+  gridMaterial.majorUnitFrequency = 5;
+  gridMaterial.minorUnitVisibility = 0.5;
+  gridMaterial.mainColor = new Color3(0.1, 0.1, 0.1);
+  gridMaterial.lineColor = GRID_COLOR;
+  grid.material = gridMaterial;
+
+
+  const blockMaterial = new StandardMaterial("blockMaterial", scene);
+  blockMaterial.diffuseColor = new Color3(0.5, 0.7, 1.0);
+
+
+  const ribbonPoints = [];
+
+  for (let i = 0; i < NUM_BLOCKS; i++) {
+    const height = Math.random() * 10 + 1;
+    const block = MeshBuilder.CreateBox("box", { size: 1, height: height }, scene);
+    const x = Math.floor(Math.random() * gridSize) - gridSize / 2 + 0.5;
+    const z = Math.floor(Math.random() * gridSize) - gridSize / 2 + 0.5;
+    block.position = new Vector3(x, height / 2, z);
+    block.material = blockMaterial;
+
+    if (height > 5) {
+      ribbonPoints.push({
+        x, y: height, z
+      });
+    }
+  }
+
+  ribbonPoints.sort((a, b) => {
+    return b.y - a.y;
+  });
+
+  // for (let i = -10; i <= 10; i++) {
+  //   ribbonPoints.push({ x: i, y: 1 + Math.sin(i / 2) * 2, z: 5 + i/4 });
+  // }
+  addRibbon(ribbonPoints, new Color3(1, 0, 0), scene);
+
+  return scene;
+};
+
+const scene = createScene();
+
+engine.runRenderLoop(function () {
+  scene.render();
+});
+
+window.addEventListener("resize", function () {
+  engine.resize();
+});
