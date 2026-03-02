@@ -8,8 +8,8 @@
   "main": "dist/main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild src/main.ts --bundle --outfile=dist/main.js",
-    "build:watch": "esbuild src/main.ts --bundle --outfile=dist/main.js --watch",
+    "build": "esbuild src/main.ts --bundle --minify --outfile=dist/main.js",
+    "build:watch": "esbuild src/main.ts --bundle --minify --outfile=dist/main.js --watch",
     "live-server": "live-server --port=8080 --no-browser --watch=dist,index.html",
     "start": "npm-run-all --parallel build:watch live-server"
   },

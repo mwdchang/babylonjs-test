@@ -1,3 +1,5 @@
+// TODO
+// Treeshaking: https://doc.babylonjs.com/setup/frameworkPackages/es6Support
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { Color3, Color4, Vector3 } from "@babylonjs/core/Maths/math";
@@ -9,16 +11,15 @@ import { GridMaterial } from "@babylonjs/materials/grid";
 import { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
 import { Curve3 } from "@babylonjs/core/Maths/math.path";
 import { PointerEventTypes } from "@babylonjs/core";
-import * as GUI from "@babylonjs/gui";
+import { TextBlock, AdvancedDynamicTexture, Control } from "@babylonjs/gui";
 
-
-const text = new GUI.TextBlock();
+const text = new TextBlock();
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const engine = new Engine(canvas, true);
 
 const CAMERA_POS = new Vector3(20, 20, 20);
-const GRID_COLOR = new Color3(0.3, 0.3, 0.3);
+const GRID_COLOR = new Color3(0.5, 0.5, 0.5);
 const GOAL_COLOR = new Color3(0.2, 0.9, 0.1);
 
 const NUM_BLOCKS = 60;
@@ -197,14 +198,14 @@ const createScene = (): Scene => {
     }
   });
 
-  const advancedTexture = GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+  const advancedTexture = AdvancedDynamicTexture.CreateFullscreenUI("UI");
   // Create text
   text.text = "";
   text.color = "white";
   text.fontSize = 16;
   text.top = "-45%";   // position
-  text.horizontalAlignment = GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
-  text.verticalAlignment = GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  text.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+  text.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
 
   advancedTexture.addControl(text);
 
