@@ -8,7 +8,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { GridMaterial } from "@babylonjs/materials/grid";
 import { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
 import { Curve3 } from "@babylonjs/core/Maths/math.path";
-import { Mesh, PointerEventTypes } from "@babylonjs/core";
+import { PointerEventTypes } from "@babylonjs/core";
 import * as GUI from "@babylonjs/gui";
 
 
@@ -18,12 +18,17 @@ const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const engine = new Engine(canvas, true);
 
 const CAMERA_POS = new Vector3(20, 20, 20);
-const GRID_COLOR = new Color3(0.5, 0.5, 0.5);
-const NUM_BLOCKS = 40;
+const GRID_COLOR = new Color3(0.3, 0.3, 0.3);
+const GOAL_COLOR = new Color3(0.2, 0.9, 0.1);
+
+const NUM_BLOCKS = 60;
 const RIBBON_WIDTH = 0.2;
 
 let tempMaterial: StandardMaterial;
 let tempColor: Color3;
+let tempX = 0;
+let tempY = 0;
+let isDragging = true;
 const PICKED_COLOR = new Color3(0.9, 0.9, 0.1);
 
 const addRibbon = (points: { x: number, y: number, z: number }[], color: Color3, scene: Scene) => {
@@ -89,6 +94,8 @@ const createScene = (): Scene => {
 
   const ribbonPoints = [];
 
+  const dupes = new Set<string>();
+
   for (let i = 0; i < NUM_BLOCKS; i++) {
     const blockMaterial = new StandardMaterial("blockMaterial", scene);
     blockMaterial.diffuseColor = new Color3(0.8, 0.8, 0.8);
@@ -100,10 +107,18 @@ const createScene = (): Scene => {
     const x = Math.floor(Math.random() * gridSize) - gridSize / 2 + 0.5;
     const z = Math.floor(Math.random() * gridSize) - gridSize / 2 + 0.5;
 
+    const key = `${x}:${z}`;
+    if (dupes.has(key)) {
+      console.log(key);
+      continue;
+    } else {
+      dupes.add(key);
+    }
+
     if (Math.abs(x) < 3 && Math.abs(z) < 3) {
       height = Math.random() * 12 + 3;
     }
-    const block = MeshBuilder.CreateBox("box", { size: 1, height: height }, scene);
+    const block = MeshBuilder.CreateBox("box", { size: 0.5, height: height }, scene);
     block.metadata = {
       id: i,
       height: height
@@ -113,7 +128,7 @@ const createScene = (): Scene => {
     block.material = blockMaterial;
 
     if (height > 5) {
-      blockMaterial.diffuseColor = new Color3(0.8, 0.4, 0.4);
+      blockMaterial.diffuseColor = GOAL_COLOR;
       ribbonPoints.push({
         x, y: height, z
       });
@@ -124,20 +139,33 @@ const createScene = (): Scene => {
     return b.y - a.y;
   });
 
-  addRibbon(ribbonPoints, new Color3(1, 0, 0), scene);
+  addRibbon(ribbonPoints, GOAL_COLOR, scene);
 
 
   // Picking logic
   scene.onPointerObservable.add((pointerInfo) => {
     switch (pointerInfo.type) {
       case PointerEventTypes.POINTERDOWN:
+        tempX = pointerInfo.event.clientX;
+        tempY = pointerInfo.event.clientY;
+        isDragging = false;
+        break;
+      case PointerEventTypes.POINTERMOVE:
+        const dx = pointerInfo.event.clientX - tempX;
+        const dy = pointerInfo.event.clientY - tempY;
+
+        if (Math.sqrt(dx * dx + dy * dy) > 5.0) {
+          isDragging = true;
+        }
+        break;
+      case PointerEventTypes.POINTERUP:
         const pickResult = scene.pick(scene.pointerX, scene.pointerY);
-        if (pickResult.hit && pickResult.pickedMesh) {
+        if (pickResult.hit && pickResult.pickedMesh && isDragging === false) {
 
           const metadata = pickResult.pickedMesh.metadata;
           if (metadata) {
             console.log(metadata);
-            text.text = `block ${metadata.id}, height = ${metadata.height}`;
+            text.text = `block ${metadata.id}, height = ${metadata.height.toFixed(2)}`;
           } else {
             text.text = '';
           }
@@ -153,13 +181,17 @@ const createScene = (): Scene => {
             tempMaterial = pickedMaterial as StandardMaterial;
           }
 
-
           /*
           const pickedMesh = pickResult.pickedMesh as Mesh & { _blockIndex?: number };
           if (pickedMesh._blockIndex !== undefined) {
             console.log("Block clicked: Index =", pickedMesh._blockIndex, "Name =", pickedMesh.name);
           }
           */
+        } else {
+          if (tempMaterial) {
+            (tempMaterial as StandardMaterial).diffuseColor = tempColor;
+            text.text = '';
+          }
         }
         break;
     }
