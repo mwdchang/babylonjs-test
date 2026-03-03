@@ -10,7 +10,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { GridMaterial } from "@babylonjs/materials/grid";
 import { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
 import { Curve3 } from "@babylonjs/core/Maths/math.path";
-import { PointerEventTypes } from "@babylonjs/core";
+import { Mesh, PointerEventTypes } from "@babylonjs/core";
 import { TextBlock, AdvancedDynamicTexture, Control } from "@babylonjs/gui";
 
 const text = new TextBlock();
@@ -19,11 +19,15 @@ const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const engine = new Engine(canvas, true);
 
 // Configurations
+const EPS = 0.0001;
 const GRID_SIZE = 20;
 const CAMERA_POS = new Vector3(20, 20, 20);
 const GRID_COLOR = new Color3(0.5, 0.5, 0.5);
+
 const GOAL_COLOR = new Color3(0.2, 0.9, 0.1);
-const NUM_BLOCKS = 20;
+const NORMAL_COLOR = new Color3(0.5, 0.5, 0.5); 
+
+const NUM_BLOCKS = 100;
 const RIBBON_WIDTH = 0.1;
 
 
@@ -41,6 +45,8 @@ let tempY = 0;
 let isDragging = true;
 const PICKED_COLOR = new Color3(0.9, 0.9, 0.1);
 
+let watermarkBlock: Mesh;
+let watermarkHeight = 0;
 
 function randomNumbers(len: number) {
   let values = Array.from({ length: len }, () => Math.random());
@@ -95,14 +101,18 @@ const createScene = (): Scene => {
   camera.setPosition(CAMERA_POS);
   camera.attachControl(canvas, true);
 
+
+  // Do not hijack keyboard arrow keys
+  camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
+
   const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-  light.intensity = 1.2;
+  light.intensity = 1.1;
 
 
   const grid: GroundMesh = MeshBuilder.CreateGround("grid", {
     width: GRID_SIZE,
     height: GRID_SIZE,
-    subdivisions: GRID_SIZE 
+    subdivisions: 0 // GRID_SIZE 
   }, scene);
   const gridMaterial = new GridMaterial("gridMaterial", scene);
   gridMaterial.majorUnitFrequency = 5;
@@ -111,7 +121,7 @@ const createScene = (): Scene => {
   gridMaterial.lineColor = GRID_COLOR;
   gridMaterial.backFaceCulling = false; // Disable back-face culling for the grid
   grid.material = gridMaterial;
-  grid.position.y = -0.001;
+  grid.position.y = -EPS;
 
 
   const ribbonPoints = [];
@@ -136,12 +146,12 @@ const createScene = (): Scene => {
     }
 
     const blockMaterial = new StandardMaterial("blockMaterial", scene);
-    blockMaterial.diffuseColor = height > 5 ? GOAL_COLOR : new Color3(0.8, 0.8, 0.8);
+    blockMaterial.diffuseColor = height > 5 ? GOAL_COLOR : NORMAL_COLOR;
     blockMaterial.alpha = 0.9;
 
 
     // Tapered block (top is smaller)
-    const ratios = randomNumbers(4)
+    const ratios = randomNumbers(5)
     let posY = 0;
 
     for (let i = 0; i < ratios.length; i++) {
@@ -164,36 +174,6 @@ const createScene = (): Scene => {
       block.material = blockMaterial;
     }
 
-    
-    /*
-    const testRandom = 0.75;
-    const block = MeshBuilder.CreateCylinder("taperedCube", {
-        height: height * (testRandom),
-        diameterTop: 0.25,
-        diameterBottom: 0.75,
-        tessellation: 6
-    }, scene);
-    // block.position = new Vector3(x, height / 2, z);
-    block.position = new Vector3(x, (height * testRandom) / 2, z);
-    block.material = blockMaterial;
-
-
-    
-    const block2 = MeshBuilder.CreateCylinder("taperedCube", {
-        height: height * (1 - testRandom),
-        diameterTop: 0.55,
-        diameterBottom: 0.75,
-        tessellation: 6
-    }, scene);
-    // block2.position = new Vector3(x, height / 2, z);
-    block2.position = new Vector3(x, (height / 2) + 1.5 * (height * (1 - testRandom)), z);
-    block2.material = blockMaterial;
-    */
-   
-
-
-
-
     // Regular block
     // const block = MeshBuilder.CreateBox("box", { size: 0.5, height: height }, scene);
     // block.position = new Vector3(x, height / 2, z);
@@ -202,13 +182,22 @@ const createScene = (): Scene => {
     //   height: height
     // };
 
-
     if (height > 5) {
       ribbonPoints.push({
         x, y: height, z
       });
     }
   }
+
+  // const watermarkBlock = MeshBuilder.CreateBox("box", { size: 20, height: 3 }, scene);
+  // watermarkBlock.position.x = 0;
+  // watermarkBlock.position.z = 0;
+
+  // const watermarkMaterial = new StandardMaterial("blockMaterial", scene);
+  // watermarkMaterial.diffuseColor = new Color3(0.1, 0.1, 0.9);
+  // watermarkMaterial.alpha = 1.0;
+  // watermarkBlock.material = watermarkMaterial;
+
 
   // Sort from highest to lowest
   ribbonPoints.sort((a, b) => {
@@ -288,4 +277,34 @@ engine.runRenderLoop(function () {
 
 window.addEventListener("resize", function () {
   engine.resize();
+});
+
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowUp") {
+    watermarkHeight += 0.1;
+  }
+
+  if (event.key === "ArrowDown") {
+    watermarkHeight -= 0.1;
+    if (watermarkHeight < 0) {
+      watermarkHeight = 0;
+    }
+  }
+
+  if (watermarkBlock) {
+    watermarkBlock.dispose()
+  }
+  if (watermarkHeight <= 0) {
+    return;
+  }
+
+  watermarkBlock = MeshBuilder.CreateBox("box", { size: 20, height: watermarkHeight }, scene);
+  watermarkBlock.position.x = 0;
+  watermarkBlock.position.z = 0;
+  watermarkBlock.position.y = 0.5 * watermarkHeight;
+
+  const watermarkMaterial = new StandardMaterial("blockMaterial", scene);
+  watermarkMaterial.diffuseColor = new Color3(0.1, 0.1, 0.9);
+  watermarkBlock.material = watermarkMaterial;
 });
